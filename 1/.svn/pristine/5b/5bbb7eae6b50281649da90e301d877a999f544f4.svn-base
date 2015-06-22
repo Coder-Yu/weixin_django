@@ -1,0 +1,56 @@
+#coding=utf-8
+import hashlib
+import json
+from xml.etree import ElementTree
+from django.utils.encoding import smart_str
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+import datetime
+
+
+def current_datetime(request):
+    now = datetime.datetime.now()
+    html = "<html><body>It is now %s.</body></html>" % now
+    return HttpResponse(html)
+
+def checkSignature(request):
+    TOKEN = 'hxsoccer123'
+    signature = request.GET.get("signature", None)
+    timestamp = request.GET.get("timestamp", None)
+    nonce = request.GET.get("nonce", None)
+    echoStr = request.GET.get("echostr",None)
+    token = TOKEN
+    tmpList = [token,timestamp,nonce]
+    tmpList.sort()
+    tmpstr = "%s%s%s" % tuple(tmpList)
+    tmpstr = hashlib.sha1(tmpstr).hexdigest()
+    if tmpstr == signature:
+        return HttpResponse(echoStr)
+    else:
+        return HttpResponse("ERROR")
+
+def sendTxtMsg(request):
+    xmlstr = smart_str(request.body)
+    xml =ElementTree.fromstring(xmlstr)
+    ToUserName = xml.find('ToUserName').text
+    FromUserName = xml.find('FromUserName').text
+    CreateTime =xml.find('CreateTime').text
+    MsgType = xml.find('MsgType').text
+    Content = xml.find('Content').text
+    MsgId = xml.find('MsgId').text
+    reply_xml = """<xml>
+    <ToUserName><![CDATA[%s]]></ToUserName>
+    <FromUserName><![CDATA[%s]]></FromUserName>
+    <CreateTime>%s</CreateTime>
+    <MsgType><![CDATA[text]]></MsgType>
+    <Content><![CDATA[%s]]></Content>
+    </xml>""" %(FromUserName,ToUserName,datetime.datetime.now(),Content+'   test!')
+
+    return HttpResponse(reply_xml)
+
+@csrf_exempt
+def weixin(request):
+    if request.method == 'GET':
+        return checkSignature(request)
+    else:
+        return sendTxtMsg(request)
